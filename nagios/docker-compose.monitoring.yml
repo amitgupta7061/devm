@@ -1,0 +1,28 @@
+version: '3.8'
+
+# ==============================================================
+# Nagios Core Containerized Monitoring Service
+# Course: INT333 - DevOps Advanced Configuration Management
+# Access Web Dashboard at http://localhost:8085
+# Default Login: nagiosadmin / nagios
+# ==============================================================
+
+services:
+  nagios:
+    image: jasonari/nagios:latest
+    container_name: smart_campus_nagios
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    environment:
+      - NAGIOSADMIN_USER=nagiosadmin
+      - NAGIOSADMIN_PASS=nagios
+      - NAGIOS_TIMEZONE=Asia/Kolkata
+    volumes:
+      - ./nagios.cfg:/opt/nagios/etc/nagios.cfg:ro
+      - ./objects/campus_server.cfg:/opt/nagios/etc/objects/campus_server.cfg:ro
+      - ./objects/commands.cfg:/opt/nagios/etc/objects/commands.cfg:ro
+      - ./plugins/check_campus_health.sh:/opt/nagios/libexec/check_campus_health.sh:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+

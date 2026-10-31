@@ -1,0 +1,86 @@
+services:
+  # ==========================================================
+  # Database Service: MongoDB
+  # ==========================================================
+  mongo:
+    image: mongo:7.0
+    container_name: smart_campus_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: smart_campus_db
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - campus_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ==========================================================
+  # Backend API Service: Node.js Express REST API
+  # ==========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart_campus_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/smart_campus_db
+      - JWT_SECRET=smartcampus_jwt_secret_devops_2026
+      - JWT_EXPIRES_IN=7d
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - campus_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:5000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ==========================================================
+  # Frontend Web Service: React + Vite served via Nginx
+  # ==========================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smart_campus_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - campus_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+# ==========================================================
+# Persistent Volumes and Bridge Network
+# ==========================================================
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  campus_net:
+    driver: bridge

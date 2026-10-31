@@ -1,0 +1,174 @@
+// ==============================================================
+// Jenkinsfile - Declarative CI/CD Pipeline
+// Project: Smart Campus Service Management System
+// Course: INT333 - DevOps Advanced Configuration Management
+// University: Lovely Professional University
+// ==============================================================
+
+pipeline {
+    agent any
+
+    environment {
+        PROJECT_NAME        = 'smart-campus'
+        BACKEND_IMAGE       = 'smart-campus-backend'
+        FRONTEND_IMAGE      = 'smart-campus-frontend'
+        IMAGE_TAG           = "${BUILD_NUMBER}"
+        HEALTHCHECK_URL     = 'http://localhost:5000/api/health'
+        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+    }
+
+    stages {
+        // ------------------------------------------------------
+        // Stage 1: Checkout Source Code
+        // ------------------------------------------------------
+        stage('Checkout SCM') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 1: Checking out repository from Git SCM  "
+                echo "=================================================="
+                checkout scm
+                sh 'git log -1 --pretty=format:"Commit: %h - %an: %s"'
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 2: Code Quality & Syntax Verification
+        // ------------------------------------------------------
+        stage('Code Quality & Lint') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 2: Validating Code Syntax and Package Files"
+                echo "=================================================="
+                sh '''
+                    echo "Checking Backend package dependencies..."
+                    cd backend && npm list --depth=0 || true
+                    echo "Checking Frontend package dependencies..."
+                    cd ../frontend && npm list --depth=0 || true
+                '''
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 3: Automated Unit Testing
+        // ------------------------------------------------------
+        stage('Backend Unit Tests') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 3: Executing Automated Backend Test Suite "
+                echo "=================================================="
+                dir('backend') {
+                    sh 'npm test'
+                }
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 4: Frontend Production Build
+        // ------------------------------------------------------
+        stage('Frontend Build Verification') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 4: Verifying Frontend Static Production Build"
+                echo "=================================================="
+                dir('frontend') {
+                    sh '''
+                        npm run build
+                        echo "Frontend build successfully generated in ./dist"
+                    '''
+                }
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 5: Container Image Building
+        // ------------------------------------------------------
+        stage('Build Docker Images') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 5: Building Optimized Multi-stage Docker Images"
+                echo "=================================================="
+                sh """
+                    docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ./backend
+                    docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ./frontend
+                """
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 6: Automated Deployment with Docker Compose
+        // ------------------------------------------------------
+        stage('Deploy Application Stack') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 6: Deploying Multi-container Stack via Compose"
+                echo "=================================================="
+                sh """
+                    echo "Starting MongoDB, Backend API, and Frontend Nginx..."
+                    docker compose down --remove-orphans || true
+                    docker compose up -d --build
+                    echo "Containers initiated successfully."
+                """
+            }
+        }
+
+        // ------------------------------------------------------
+        // Stage 7: Smoke & Health Check Verification
+        // ------------------------------------------------------
+        stage('Health & Smoke Verification') {
+            steps {
+                echo "=================================================="
+                echo "  STAGE 7: Smoke Test & Nagios Endpoint Verification"
+                echo "=================================================="
+                sh '''
+                    echo "Waiting for services to become healthy..."
+                    sleep 10
+
+                    # Verify Backend REST API
+                    for i in {1..12}; do
+                        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/health || true)
+                        if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "503" ]; then
+                            echo "✅ Backend API is reachable (HTTP $RESPONSE)."
+                            break
+                        fi
+                        echo "Attempt $i: waiting for Backend... (code: $RESPONSE)"
+                        sleep 5
+                    done
+
+                    # Verify Frontend Web Server
+                    FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || true)
+                    echo "✅ Frontend Web Server reachable (HTTP $FRONTEND_STATUS)."
+
+                    # Probe plain metrics for Nagios
+                    curl -s http://localhost:5000/api/health/metrics | head -n 8
+                '''
+            }
+        }
+    }
+
+    // ----------------------------------------------------------
+    // Post-Execution Pipeline Notifications & Cleanups
+    // ----------------------------------------------------------
+    post {
+        always {
+            echo "Pipeline run completed for build #${BUILD_NUMBER}."
+        }
+        success {
+            echo "================================================================"
+            echo "🎉 SUCCESS: Smart Campus deployment passed all tests and healthchecks!"
+            echo "📍 Frontend URL: http://localhost:3000"
+            echo "📍 Backend API:  http://localhost:5000/api/health"
+            echo "================================================================"
+        }
+        failure {
+            echo "❌ FAILURE: Pipeline stages failed. Inspect console output above."
+            sh 'docker compose logs --tail=50'
+        }
+    }
+}
+

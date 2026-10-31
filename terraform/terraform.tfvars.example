@@ -1,0 +1,10 @@
+# Example Terraform Variable Values
+# Rename this file to terraform.tfvars and customize for your AWS credentials
+
+aws_region          = "ap-south-1"
+environment         = "production"
+project_name        = "smart-campus"
+instance_type       = "t2.micro"
+key_name            = "campus-devops-key"
+allowed_cidr_blocks = ["0.0.0.0/0"]
+
