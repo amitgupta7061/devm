@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   Server, 
   Cloud, 
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function DevOpsMonitoring({ onBack }) {
+  const toast = useToast();
   const [activeDevOpsTab, setActiveDevOpsTab] = useState('pipeline'); // 'pipeline', 'nagios', 'terraform', 'puppet', 'docker', 'telemetry'
   const [healthData, setHealthData] = useState(null);
   const [loadingHealth, setLoadingHealth] = useState(true);
@@ -69,12 +71,20 @@ export default function DevOpsMonitoring({ onBack }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
       });
-      if (action === 'simulate_db_down') setChaosState('DB_DOWN');
-      else if (action === 'restore_db') setChaosState('NORMAL');
-      else if (action === 'simulate_latency') setChaosState('LATENCY');
+      if (action === 'simulate_db_down') {
+        setChaosState('DB_DOWN');
+        toast.error('Chaos Injected: MongoDB outage simulated. Nagios check_campus_api_health will fail.');
+      } else if (action === 'restore_db') {
+        setChaosState('NORMAL');
+        toast.success('System Restored: All Nagios service checks healthy.');
+      } else if (action === 'simulate_latency') {
+        setChaosState('LATENCY');
+        toast.info('Chaos Injected: 2000ms latency injected. Check warning threshold.');
+      }
       await fetchHealth();
     } catch (e) {
       console.error('Chaos update error:', e);
+      toast.error('Failed to trigger chaos simulation action.');
     }
   };
 
@@ -114,6 +124,7 @@ export default function DevOpsMonitoring({ onBack }) {
         setPipelineRunning(false);
         setActiveStageIndex(null);
         setPipelinePassed(true);
+        toast.success('Jenkins Pipeline Build #12 completed successfully!');
         setPipelineLogs(prev => [
           ...prev,
           `[${new Date().toLocaleTimeString()}] Stage 'Healthcheck Verification' verified HTTP 200 on /api/health`,
@@ -167,7 +178,11 @@ export default function DevOpsMonitoring({ onBack }) {
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-900 rounded-xl border border-slate-800">
+      <div 
+        role="tablist" 
+        aria-label="DevOps architecture tools"
+        className="flex overflow-x-auto gap-2 p-1.5 bg-slate-900 rounded-xl border border-slate-800 scrollbar-none"
+      >
         {[
           { id: 'pipeline', label: '1. Jenkins CI/CD Pipeline', icon: GitBranch },
           { id: 'nagios', label: '2. Nagios Monitoring & Chaos Testing', icon: Activity },
@@ -177,12 +192,15 @@ export default function DevOpsMonitoring({ onBack }) {
           { id: 'telemetry', label: '6. Live Health & Metrics API', icon: Server }
         ].map(tab => {
           const Icon = tab.icon;
+          const isSelected = activeDevOpsTab === tab.id;
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isSelected}
               onClick={() => setActiveDevOpsTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeDevOpsTab === tab.id
+              className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-sky-400 ${
+                isSelected
                   ? 'bg-sky-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
@@ -210,9 +228,10 @@ export default function DevOpsMonitoring({ onBack }) {
               </div>
 
               <button
+                type="button"
                 onClick={runPipelineSimulation}
                 disabled={pipelineRunning}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <Play className="w-4 h-4" />
                 <span>{pipelineRunning ? 'Pipeline Executing...' : '▶ Run Live CI/CD Build'}</span>
@@ -220,7 +239,7 @@ export default function DevOpsMonitoring({ onBack }) {
             </div>
 
             {/* Stages Visual Progression */}
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-2 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-2">
               {pipelineStages.map((st, idx) => {
                 const isCurrent = activeStageIndex === idx;
                 const isCompleted = activeStageIndex !== null ? idx < activeStageIndex : !pipelineRunning;

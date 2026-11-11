@@ -13,12 +13,15 @@ import {
   FileText,
   ChevronRight,
   Inbox,
-  Loader2
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
 import CategoryBadge from '../components/CategoryBadge';
 import ComplaintModal from '../components/ComplaintModal';
+import ResolutionModal from '../components/ResolutionModal';
+import { useToast } from '../context/ToastContext';
 
 export default function StaffDashboard({ user }) {
   const [complaints, setComplaints] = useState([]);
@@ -26,9 +29,15 @@ export default function StaffDashboard({ user }) {
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
 
-  // Modal
+  // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  
+  // Custom Resolution Modal
+  const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [resolvingComplaint, setResolvingComplaint] = useState(null);
+
+  const toast = useToast();
 
   const fetchAssignedComplaints = async () => {
     setLoading(true);
@@ -41,7 +50,7 @@ export default function StaffDashboard({ user }) {
         setComplaints(res.data);
       }
     } catch (err) {
-      console.error('Error fetching assigned complaints:', err);
+      toast.error('Failed to load tickets', err.message || 'Error fetching assigned complaints.');
     } finally {
       setLoading(false);
     }
@@ -57,28 +66,44 @@ export default function StaffDashboard({ user }) {
   };
 
   const handleUpdateComplaint = async (id, data) => {
-    await api.complaints.update(id, data);
-    await fetchAssignedComplaints();
+    try {
+      await api.complaints.update(id, data);
+      toast.success('Ticket Updated', 'Work order updates saved successfully.');
+      await fetchAssignedComplaints();
+    } catch (err) {
+      toast.error('Update Failed', err.message || 'Error updating complaint.');
+      throw err;
+    }
   };
 
   // Quick 1-click status change
-  const handleQuickStatusChange = async (comp, newStatus) => {
-    let resolutionRemarks = comp.resolutionRemarks;
-    if (newStatus === 'Resolved') {
-      const promptRemarks = window.prompt('Please enter resolution remarks for this complaint:', 'Work completed and verified.');
-      if (!promptRemarks) return;
-      resolutionRemarks = promptRemarks;
-    }
-
+  const handleQuickStatusStart = async (comp) => {
     try {
       await api.complaints.update(comp._id, {
-        status: newStatus,
-        resolutionRemarks,
-        newRemark: `Status updated to ${newStatus} by ${user?.name}`
+        status: 'In Progress',
+        newRemark: `Maintenance work started by ${user?.name}`
       });
+      toast.success('Work Started', `Ticket ${comp.ticketId} marked as In Progress.`);
       await fetchAssignedComplaints();
     } catch (err) {
-      alert(err.message || 'Error updating status');
+      toast.error('Status Update Failed', err.message || 'Could not update status.');
+    }
+  };
+
+  const handleConfirmResolution = async (remarks) => {
+    if (!resolvingComplaint) return;
+    try {
+      await api.complaints.update(resolvingComplaint._id, {
+        status: 'Resolved',
+        resolutionRemarks: remarks,
+        newRemark: `Resolved by ${user?.name}: ${remarks}`
+      });
+      toast.success('Ticket Closed', `Complaint ${resolvingComplaint.ticketId} marked as Resolved.`);
+      await fetchAssignedComplaints();
+    } catch (err) {
+      toast.error('Resolution Failed', err.message || 'Could not close ticket.');
+    } finally {
+      setResolvingComplaint(null);
     }
   };
 
@@ -89,7 +114,7 @@ export default function StaffDashboard({ user }) {
   const resolvedCount = complaints.filter(c => c.status === 'Resolved').length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Staff Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -133,7 +158,7 @@ export default function StaffDashboard({ user }) {
         <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm">
           <div className="text-xs text-blue-700 font-semibold uppercase flex items-center gap-1">
             <Loader2 className="w-3.5 h-3.5" />
-            <span>Under Repair (In Progress)</span>
+            <span>Under Repair</span>
           </div>
           <div className="text-2xl font-black text-blue-900 mt-1">{inProgressCount}</div>
         </div>
@@ -150,9 +175,11 @@ export default function StaffDashboard({ user }) {
       {/* Search & Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
+            id="staff-search-input"
             type="text"
+            aria-label="Search assigned tickets"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search ticket, building, keyword..."
@@ -160,18 +187,37 @@ export default function StaffDashboard({ user }) {
           />
         </form>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <label htmlFor="staff-status-filter" className="text-xs text-slate-500 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Status:</span>
+          </label>
           <select
+            id="staff-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+            className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="All">All Statuses</option>
             <option value="Pending">Pending</option>
             <option value="In Progress">In Progress</option>
             <option value="Resolved">Resolved</option>
           </select>
+
+          {(statusFilter !== 'All' || search) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('All');
+                setSearch('');
+              }}
+              aria-label="Reset filters"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 flex items-center gap-1 transition"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -184,9 +230,11 @@ export default function StaffDashboard({ user }) {
       ) : complaints.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
           <Inbox className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-700">No tasks currently assigned</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            You're all caught up! New complaints assigned by the campus administrator will appear here.
+          <h3 className="text-base font-bold text-slate-700">No tasks currently match</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            {statusFilter !== 'All' || search 
+              ? 'No tickets match the selected status filter or search query. Try clearing your filters.'
+              : 'You have no tickets currently assigned in your queue.'}
           </p>
         </div>
       ) : (
@@ -213,7 +261,7 @@ export default function StaffDashboard({ user }) {
 
               <div>
                 <h4 className="text-base font-bold text-slate-900 mb-1">{comp.title}</h4>
-                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-line">
                   {comp.description}
                 </p>
               </div>
@@ -249,8 +297,9 @@ export default function StaffDashboard({ user }) {
                 <div className="flex items-center gap-2">
                   {comp.status === 'Pending' && (
                     <button
-                      onClick={() => handleQuickStatusChange(comp, 'In Progress')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition"
+                      type="button"
+                      onClick={() => handleQuickStatusStart(comp)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition"
                     >
                       Start Work (Mark In Progress)
                     </button>
@@ -258,8 +307,12 @@ export default function StaffDashboard({ user }) {
 
                   {comp.status === 'In Progress' && (
                     <button
-                      onClick={() => handleQuickStatusChange(comp, 'Resolved')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition flex items-center gap-1"
+                      type="button"
+                      onClick={() => {
+                        setResolvingComplaint(comp);
+                        setResolutionModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition flex items-center gap-1.5"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Mark Resolved
@@ -275,6 +328,7 @@ export default function StaffDashboard({ user }) {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedComplaint(comp);
                     setModalOpen(true);
@@ -300,7 +354,17 @@ export default function StaffDashboard({ user }) {
         currentUser={user}
         onUpdate={handleUpdateComplaint}
       />
+
+      {/* Accessible Resolution Remarks Modal */}
+      <ResolutionModal
+        isOpen={resolutionModalOpen}
+        complaintTitle={resolvingComplaint?.title}
+        onResolve={handleConfirmResolution}
+        onClose={() => {
+          setResolutionModalOpen(false);
+          setResolvingComplaint(null);
+        }}
+      />
     </div>
   );
 }
-

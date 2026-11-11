@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   MapPin, 
   Calendar, 
   User, 
   MessageSquare, 
-  Send, 
   CheckCircle2, 
   AlertCircle,
   Building,
@@ -26,8 +25,6 @@ export default function ComplaintModal({
   onSubmit,
   onUpdate 
 }) {
-  if (!isOpen) return null;
-
   // New Complaint Form State
   const [formData, setFormData] = useState({
     title: '',
@@ -46,6 +43,45 @@ export default function ComplaintModal({
   const [newRemarkText, setNewRemarkText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const firstInputRef = useRef(null);
+
+  // Synchronize state when complaint changes
+  useEffect(() => {
+    if (complaint) {
+      setUpdateStatus(complaint.status || 'Pending');
+      setUpdatePriority(complaint.priority || 'Medium');
+      setUpdateAssignedTo(complaint.assignedTo?._id || '');
+      setResolutionRemarks(complaint.resolutionRemarks || '');
+      setNewRemarkText('');
+      setErrorMsg('');
+    }
+  }, [complaint]);
+
+  // Handle Escape key and disable body scroll
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      firstInputRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
@@ -66,6 +102,15 @@ export default function ComplaintModal({
           roomOrArea: formData.roomOrArea
         },
         description: formData.description
+      });
+      // Reset form
+      setFormData({
+        title: '',
+        category: 'Wi-Fi / Internet',
+        priority: 'Medium',
+        building: '',
+        roomOrArea: '',
+        description: ''
       });
       onClose();
     } catch (err) {
@@ -97,19 +142,29 @@ export default function ComplaintModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complaint-modal-title"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150 my-6">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Building className="w-5 h-5 text-sky-400" />
-            <h3 className="font-bold text-lg">
+            <h3 id="complaint-modal-title" className="font-bold text-base sm:text-lg">
               {mode === 'create' ? 'Submit New Campus Complaint' : `Ticket ${complaint?.ticketId || 'Details'}`}
             </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+            aria-label="Close modal dialog"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition focus-visible:ring-2 focus-visible:ring-sky-400"
           >
             <X className="w-5 h-5" />
           </button>
@@ -126,10 +181,12 @@ export default function ComplaintModal({
         {mode === 'create' && (
           <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              <label htmlFor="complaint-title-input" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Complaint Title *
               </label>
               <input
+                id="complaint-title-input"
+                ref={firstInputRef}
                 type="text"
                 required
                 value={formData.title}
@@ -141,10 +198,11 @@ export default function ComplaintModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                <label htmlFor="complaint-category-select" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                   Category *
                 </label>
                 <select
+                  id="complaint-category-select"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
@@ -161,15 +219,16 @@ export default function ComplaintModal({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                <label htmlFor="complaint-priority-select" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                   Priority Level *
                 </label>
                 <select
+                  id="complaint-priority-select"
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                   className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
                 >
-                  <option value="Low">Low (General suggestion/routine)</option>
+                  <option value="Low">Low (General suggestion / routine)</option>
                   <option value="Medium">Medium (Affects normal task)</option>
                   <option value="High">High (Impacting ongoing classes)</option>
                   <option value="Urgent">Urgent (Safety / Critical lab failure)</option>
@@ -179,10 +238,11 @@ export default function ComplaintModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                <label htmlFor="complaint-building-input" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                   Campus Block / Building *
                 </label>
                 <input
+                  id="complaint-building-input"
                   type="text"
                   required
                   value={formData.building}
@@ -193,10 +253,11 @@ export default function ComplaintModal({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                <label htmlFor="complaint-room-input" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                   Room / Area identifier *
                 </label>
                 <input
+                  id="complaint-room-input"
                   type="text"
                   required
                   value={formData.roomOrArea}
@@ -208,10 +269,11 @@ export default function ComplaintModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              <label htmlFor="complaint-description-textarea" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Detailed Description *
               </label>
               <textarea
+                id="complaint-description-textarea"
                 rows={4}
                 required
                 value={formData.description}
@@ -225,14 +287,14 @@ export default function ComplaintModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-sm transition disabled:opacity-50"
+                className="px-5 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-sm transition disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Register Complaint'}
               </button>
@@ -242,7 +304,7 @@ export default function ComplaintModal({
 
         {/* ===================== VIEW & UPDATE MODE ===================== */}
         {mode !== 'create' && complaint && (
-          <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             {/* Badges & Meta */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -259,7 +321,7 @@ export default function ComplaintModal({
             {/* Title & Description */}
             <div>
               <h4 className="text-base font-bold text-slate-900 mb-1">{complaint.title}</h4>
-              <p className="text-sm text-slate-600 bg-slate-50 p-3.5 rounded-lg border border-slate-100 leading-relaxed">
+              <p className="text-sm text-slate-600 bg-slate-50 p-3.5 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-line">
                 {complaint.description}
               </p>
             </div>
@@ -271,8 +333,8 @@ export default function ComplaintModal({
                   <MapPin className="w-3.5 h-3.5 text-sky-600" />
                   <span>Location</span>
                 </div>
-                <div className="text-slate-700">{complaint.location?.building}</div>
-                <div className="text-slate-500 font-medium">Room / Area: {complaint.location?.roomOrArea}</div>
+                <div className="text-slate-700 font-medium">{complaint.location?.building}</div>
+                <div className="text-slate-500">Room / Area: {complaint.location?.roomOrArea}</div>
               </div>
 
               <div className="space-y-1">
@@ -325,7 +387,7 @@ export default function ComplaintModal({
             <div>
               <h5 className="text-xs font-bold text-slate-700 uppercase mb-2 flex items-center gap-1">
                 <MessageSquare className="w-3.5 h-3.5 text-sky-600" />
-                <span>Remarks & Updates ({complaint.remarks?.length || 0})</span>
+                <span>Remarks & Work Log ({complaint.remarks?.length || 0})</span>
               </h5>
               
               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
@@ -357,10 +419,11 @@ export default function ComplaintModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                    <label htmlFor="complaint-update-status" className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                       Status
                     </label>
                     <select
+                      id="complaint-update-status"
                       value={updateStatus}
                       onChange={(e) => setUpdateStatus(e.target.value)}
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-sky-500"
@@ -375,10 +438,11 @@ export default function ComplaintModal({
                   {currentUser.role === 'admin' && (
                     <>
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                        <label htmlFor="complaint-update-priority" className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                           Priority
                         </label>
                         <select
+                          id="complaint-update-priority"
                           value={updatePriority}
                           onChange={(e) => setUpdatePriority(e.target.value)}
                           className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-sky-500"
@@ -391,10 +455,11 @@ export default function ComplaintModal({
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                        <label htmlFor="complaint-update-assign" className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                           Assign Staff
                         </label>
                         <select
+                          id="complaint-update-assign"
                           value={updateAssignedTo}
                           onChange={(e) => setUpdateAssignedTo(e.target.value)}
                           className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-sky-500"
@@ -414,10 +479,11 @@ export default function ComplaintModal({
                 {/* If marking as Resolved, show resolution remarks */}
                 {updateStatus === 'Resolved' && (
                   <div>
-                    <label className="block text-[11px] font-semibold text-emerald-800 uppercase mb-1">
+                    <label htmlFor="complaint-resolution-input" className="block text-[11px] font-semibold text-emerald-800 uppercase mb-1">
                       Resolution Remarks (Required for closing ticket)
                     </label>
                     <input
+                      id="complaint-resolution-input"
                       type="text"
                       value={resolutionRemarks}
                       onChange={(e) => setResolutionRemarks(e.target.value)}
@@ -429,11 +495,12 @@ export default function ComplaintModal({
 
                 {/* Add new comment */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                  <label htmlFor="complaint-remark-input" className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                     Add Work Log Remark / Note
                   </label>
                   <div className="flex gap-2">
                     <input
+                      id="complaint-remark-input"
                       type="text"
                       value={newRemarkText}
                       onChange={(e) => setNewRemarkText(e.target.value)}
@@ -457,4 +524,3 @@ export default function ComplaintModal({
     </div>
   );
 }
-

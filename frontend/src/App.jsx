@@ -9,6 +9,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import DevOpsMonitoring from './pages/DevOpsMonitoring';
+import NotFound from './pages/NotFound';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {

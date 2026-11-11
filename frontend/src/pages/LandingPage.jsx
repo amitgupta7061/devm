@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   Terminal, 
@@ -21,10 +21,22 @@ import {
   BarChart3,
   Flame,
   Wrench,
-  GraduationCap
+  GraduationCap,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps, onDirectDemoLogin }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && mobileMenuOpen) setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-sky-500 selection:text-white">
       {/* ===================== NAVBAR ===================== */}
@@ -47,13 +59,15 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </div>
           </div>
 
+          {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-300">
             <a href="#features" className="hover:text-white transition">Features</a>
             <a href="#devops-stack" className="hover:text-white transition">DevOps Architecture</a>
             <a href="#facilities" className="hover:text-white transition">Campus Grid</a>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Desktop Actions */}
+          <div className="hidden sm:flex items-center gap-3">
             <button
               onClick={onGoToDevOps}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 text-xs font-bold border border-sky-500/30 shadow-md transition"
@@ -69,7 +83,78 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
               Sign In / Portal
             </button>
           </div>
+
+          {/* Mobile Menu Toggle */}
+          <div className="flex sm:hidden items-center gap-2">
+            <button
+              onClick={onGoToDevOps}
+              aria-label="DevOps Console"
+              className="p-2 rounded-lg bg-slate-900 text-sky-400 border border-slate-800"
+            >
+              <Terminal className="w-4 h-4 text-emerald-400" />
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+              className="p-2 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-800"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-slate-800 bg-slate-950/98 px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-150">
+            <div className="flex flex-col gap-2 text-xs font-semibold text-slate-300">
+              <a 
+                href="#features" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-slate-900 transition"
+              >
+                Features
+              </a>
+              <a 
+                href="#devops-stack" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-slate-900 transition"
+              >
+                DevOps Architecture
+              </a>
+              <a 
+                href="#facilities" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-slate-900 transition"
+              >
+                Campus Grid
+              </a>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onGoToDevOps();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-sky-400 text-xs font-bold border border-sky-500/30"
+              >
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span>DevOps Command Center</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onGoToLogin();
+                }}
+                className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white text-xs font-bold shadow-lg"
+              >
+                Sign In to Portal
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ===================== HERO SECTION ===================== */}
@@ -84,14 +169,14 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
               <span>Next-Gen Smart Campus Facilities & Lifecycle Observability</span>
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
               Campus Service Management{' '}
               <span className="bg-gradient-to-r from-sky-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
                 Powered by DevOps Automation
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto font-normal">
+            <p className="text-sm sm:text-base lg:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto font-normal">
               Empowering students, campus administrators, and engineering field technicians with instantaneous complaint triage, automated infrastructure provisioning, and continuous monitoring.
             </p>
 
@@ -99,7 +184,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
               <button
                 onClick={onGoToDevOps}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-sm font-bold shadow-xl shadow-sky-500/25 transition transform hover:-translate-y-0.5"
+                className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-sky-500/25 transition transform hover:-translate-y-0.5"
               >
                 <Terminal className="w-4 h-4 text-emerald-300" />
                 <span>Launch Live DevOps Console</span>
@@ -108,7 +193,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
 
               <button
                 onClick={onGoToLogin}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-sm font-bold border border-slate-700 transition"
+                className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs sm:text-sm font-bold border border-slate-700 transition"
               >
                 <Users className="w-4 h-4 text-sky-400" />
                 <span>Access Campus Portals</span>
@@ -208,8 +293,57 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
         </div>
       </section>
 
+      {/* ===================== FEATURES SECTION ===================== */}
+      <section id="features" className="py-20 bg-slate-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-sky-400">
+              Core Capabilities
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white">
+              End-to-End Service Life Cycle
+            </h2>
+            <p className="text-sm text-slate-400">
+              A comprehensive system uniting student reporting, administrative dispatch, and automated infrastructure health.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
+                <GraduationCap className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Self-Service Student Redressal</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Students submit complaints with categories, priority escalation, and exact building identifiers, receiving instant tracking IDs.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Admin Triage & Workload Dispatch</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Campus administrators balance workload across maintenance engineers, escalate urgent tickets, and monitor SLA turnaround metrics.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+                <Activity className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Full-Stack DevOps Observability</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Underlying servers and containers are continuously validated with Nagios health checks, Docker healthchecks, and Jenkins CI/CD.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===================== CAMPUS FACILITIES SECTION ===================== */}
-      <section id="facilities" className="py-20 bg-slate-950">
+      <section id="facilities" className="py-20 bg-slate-900/50 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="text-xs font-extrabold uppercase tracking-widest text-sky-400">
@@ -226,10 +360,11 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Card 1: Wi-Fi */}
             <div className="group rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-sky-500/50 transition duration-300 shadow-xl flex flex-col">
-              <div className="h-44 overflow-hidden relative">
+              <div className="h-44 overflow-hidden relative bg-slate-800">
                 <img
                   src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=700&q=80"
                   alt="Campus Library & Wi-Fi"
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -256,10 +391,11 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
 
             {/* Card 2: Laboratories */}
             <div className="group rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition duration-300 shadow-xl flex flex-col">
-              <div className="h-44 overflow-hidden relative">
+              <div className="h-44 overflow-hidden relative bg-slate-800">
                 <img
                   src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=700&q=80"
                   alt="Computing Lab Workstations"
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -286,10 +422,11 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
 
             {/* Card 3: Classrooms */}
             <div className="group rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition duration-300 shadow-xl flex flex-col">
-              <div className="h-44 overflow-hidden relative">
+              <div className="h-44 overflow-hidden relative bg-slate-800">
                 <img
                   src="https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=700&q=80"
                   alt="Smart Classrooms"
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -316,10 +453,11 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
 
             {/* Card 4: Electrical & Maintenance */}
             <div className="group rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition duration-300 shadow-xl flex flex-col">
-              <div className="h-44 overflow-hidden relative">
+              <div className="h-44 overflow-hidden relative bg-slate-800">
                 <img
                   src="https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=700&q=80"
                   alt="Electrical & HVAC"
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -348,7 +486,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
       </section>
 
       {/* ===================== DEVOPS STACK DEEP-DIVE ===================== */}
-      <section id="devops-stack" className="py-20 bg-slate-900/80 border-t border-slate-800">
+      <section id="devops-stack" className="py-20 bg-slate-950 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-400">
@@ -362,9 +500,9 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
             {/* Tool 1: Terraform */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 transition space-y-3">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 transition space-y-3">
               <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
                 <Cloud className="w-6 h-6" />
               </div>
@@ -377,7 +515,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </div>
 
             {/* Tool 2: Puppet */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 transition space-y-3">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition space-y-3">
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
                 <Terminal className="w-6 h-6" />
               </div>
@@ -390,7 +528,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </div>
 
             {/* Tool 3: Docker */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 transition space-y-3">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition space-y-3">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
                 <Server className="w-6 h-6" />
               </div>
@@ -403,7 +541,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </div>
 
             {/* Tool 4: Jenkins */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 transition space-y-3">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition space-y-3">
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
                 <GitBranch className="w-6 h-6" />
               </div>
@@ -416,7 +554,7 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             </div>
 
             {/* Tool 5: Nagios */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 transition space-y-3">
+            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition space-y-3">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
                 <Activity className="w-6 h-6" />
               </div>
@@ -461,11 +599,10 @@ export default function LandingPage({ onGoToLogin, onGoToRegister, onGoToDevOps,
             <span className="font-bold text-slate-300">Smart Campus Service Management System</span>
           </div>
           <div>
-            Built with React, Express, MongoDB, Terraform, Puppet, Docker, Jenkins & Nagios
+            &copy; {new Date().getFullYear()} SmartCampus DevOps. Built with React, Express, MongoDB, Terraform, Puppet, Docker, Jenkins & Nagios.
           </div>
         </div>
       </footer>
     </div>
   );
 }
-

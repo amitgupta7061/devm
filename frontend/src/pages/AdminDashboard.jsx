@@ -19,16 +19,19 @@ import {
   Loader2,
   PieChart,
   Activity,
-  Flame
+  Flame,
+  RotateCcw
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import PriorityBadge from '../components/PriorityBadge';
 import CategoryBadge from '../components/CategoryBadge';
 import ComplaintModal from '../components/ComplaintModal';
+import ConfirmModal from '../components/ConfirmModal';
 import { DonutChart, ProgressBarGroup, VelocityAreaChart, RadialGauge } from '../components/Charts';
+import { useToast } from '../context/ToastContext';
 
 export default function AdminDashboard({ user }) {
-  const [activeSubTab, setActiveSubTab] = useState('stats'); // default to 'stats' or 'complaints'
+  const [activeSubTab, setActiveSubTab] = useState('stats'); // 'stats', 'complaints', 'users'
   const [complaints, setComplaints] = useState([]);
   const [stats, setStats] = useState(null);
   const [staffList, setStaffList] = useState([]);
@@ -41,9 +44,15 @@ export default function AdminDashboard({ user }) {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
 
-  // Modal
+  // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState(null);
+
+  const toast = useToast();
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -63,7 +72,7 @@ export default function AdminDashboard({ user }) {
       if (statsRes.success) setStats(statsRes.data);
       if (staffRes.success) setStaffList(staffRes.data);
     } catch (err) {
-      console.error('Error fetching admin dashboard data:', err);
+      toast.error('Failed to load data', err.message || 'Error fetching admin dashboard data.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +83,7 @@ export default function AdminDashboard({ user }) {
       const res = await api.users.getAll();
       if (res.success) setUsersList(res.data);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      toast.error('Failed to load users', err.message || 'Error fetching users directory.');
     }
   };
 
@@ -94,28 +103,37 @@ export default function AdminDashboard({ user }) {
   };
 
   const handleUpdateComplaint = async (id, data) => {
-    await api.complaints.update(id, data);
-    await fetchDashboardData();
-  };
-
-  const handleDeleteComplaint = async (id) => {
-    if (window.confirm('Are you sure you want to permanently delete this complaint ticket?')) {
-      try {
-        await api.complaints.delete(id);
-        await fetchDashboardData();
-      } catch (err) {
-        alert(err.message || 'Error deleting ticket');
-      }
+    try {
+      await api.complaints.update(id, data);
+      toast.success('Ticket Updated', 'Complaint status and dispatch details saved.');
+      await fetchDashboardData();
+    } catch (err) {
+      toast.error('Update Failed', err.message || 'Error updating complaint.');
+      throw err;
     }
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleConfirmDelete = async () => {
+    if (!ticketToDelete) return;
+    try {
+      await api.complaints.delete(ticketToDelete._id);
+      toast.success('Ticket Deleted', `Complaint ${ticketToDelete.ticketId} has been removed.`);
+      await fetchDashboardData();
+    } catch (err) {
+      toast.error('Deletion Failed', err.message || 'Error deleting ticket.');
+    } finally {
+      setTicketToDelete(null);
+    }
+  };
+
+  const handleRoleChange = async (userId, userName, newRole) => {
     try {
       await api.users.updateRole(userId, { role: newRole });
+      toast.success('Role Updated', `${userName}'s role changed to ${newRole.toUpperCase()}.`);
       await fetchUsers();
       await fetchDashboardData();
     } catch (err) {
-      alert(err.message || 'Error updating user role');
+      toast.error('Role Update Failed', err.message || 'Error updating user role.');
     }
   };
 
@@ -154,7 +172,7 @@ export default function AdminDashboard({ user }) {
     : 100;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Admin Header with Gradient Badge */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-800">
         <div>
@@ -175,8 +193,9 @@ export default function AdminDashboard({ user }) {
         </div>
 
         {/* Sub-tab Navigation */}
-        <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+        <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 self-start md:self-auto">
           <button
+            type="button"
             onClick={() => setActiveSubTab('stats')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
               activeSubTab === 'stats'
@@ -188,6 +207,7 @@ export default function AdminDashboard({ user }) {
             <span>Visual Analytics</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('complaints')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
               activeSubTab === 'complaints'
@@ -199,6 +219,7 @@ export default function AdminDashboard({ user }) {
             <span>All Tickets ({complaints.length})</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('users')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
               activeSubTab === 'users'
@@ -219,7 +240,7 @@ export default function AdminDashboard({ user }) {
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Tickets</div>
             <div className="text-3xl font-black text-slate-900 mt-1">{stats.summary.total}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Across all campus blocks</div>
-            <div className="absolute right-3 bottom-3 text-slate-100 -z-0">
+            <div className="absolute right-3 bottom-3 text-slate-100 pointer-events-none">
               <Layers className="w-10 h-10" />
             </div>
           </div>
@@ -264,7 +285,6 @@ export default function AdminDashboard({ user }) {
       {/* ===================== TAB 1: VISUAL ANALYTICS & CHARTS ===================== */}
       {activeSubTab === 'stats' && stats && (
         <div className="space-y-6">
-          {/* Row 1: Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Category Donut Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
@@ -363,9 +383,11 @@ export default function AdminDashboard({ user }) {
           {/* Controls Bar */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
             <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
+                id="admin-ticket-search"
                 type="text"
+                aria-label="Search all complaints"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search ticket, building, reporter..."
@@ -373,11 +395,13 @@ export default function AdminDashboard({ user }) {
               />
             </form>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+              <label htmlFor="admin-filter-status" className="sr-only">Status Filter</label>
               <select
+                id="admin-filter-status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
               >
                 <option value="All">All Statuses</option>
                 <option value="Pending">Pending</option>
@@ -385,10 +409,12 @@ export default function AdminDashboard({ user }) {
                 <option value="Resolved">Resolved</option>
               </select>
 
+              <label htmlFor="admin-filter-priority" className="sr-only">Priority Filter</label>
               <select
+                id="admin-filter-priority"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
               >
                 <option value="All">All Priorities</option>
                 <option value="Urgent">Urgent</option>
@@ -397,10 +423,12 @@ export default function AdminDashboard({ user }) {
                 <option value="Low">Low</option>
               </select>
 
+              <label htmlFor="admin-filter-category" className="sr-only">Category Filter</label>
               <select
+                id="admin-filter-category"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
               >
                 <option value="All">All Categories</option>
                 <option value="Wi-Fi / Internet">Wi-Fi / Internet</option>
@@ -410,6 +438,23 @@ export default function AdminDashboard({ user }) {
                 <option value="Hostel & Maintenance">Hostel & Maintenance</option>
                 <option value="Sanitation & Water">Sanitation & Water</option>
               </select>
+
+              {(statusFilter !== 'All' || priorityFilter !== 'All' || categoryFilter !== 'All' || search) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('All');
+                    setPriorityFilter('All');
+                    setCategoryFilter('All');
+                    setSearch('');
+                  }}
+                  aria-label="Reset all filters"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 flex items-center gap-1 transition"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -429,14 +474,14 @@ export default function AdminDashboard({ user }) {
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold text-[11px]">
                     <tr>
-                      <th className="px-4 py-3">Ticket ID</th>
-                      <th className="px-4 py-3">Title & Location</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Priority</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Assigned Staff</th>
-                      <th className="px-4 py-3">Student Reporter</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th scope="col" className="px-4 py-3">Ticket ID</th>
+                      <th scope="col" className="px-4 py-3">Title & Location</th>
+                      <th scope="col" className="px-4 py-3">Category</th>
+                      <th scope="col" className="px-4 py-3">Priority</th>
+                      <th scope="col" className="px-4 py-3">Status</th>
+                      <th scope="col" className="px-4 py-3">Assigned Staff</th>
+                      <th scope="col" className="px-4 py-3">Student Reporter</th>
+                      <th scope="col" className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -479,19 +524,26 @@ export default function AdminDashboard({ user }) {
                         </td>
                         <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedComplaint(comp);
                               setModalOpen(true);
                             }}
                             className="p-1.5 rounded-lg text-slate-600 hover:text-sky-600 hover:bg-sky-50 transition"
                             title="Manage Ticket & Assign Staff"
+                            aria-label={`Manage ticket ${comp.ticketId}`}
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteComplaint(comp._id)}
+                            type="button"
+                            onClick={() => {
+                              setTicketToDelete(comp);
+                              setDeleteModalOpen(true);
+                            }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                             title="Delete Ticket"
+                            aria-label={`Delete ticket ${comp.ticketId}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -523,12 +575,12 @@ export default function AdminDashboard({ user }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold text-[11px]">
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Department</th>
-                  <th className="px-4 py-3">ID / Reg Number</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3 text-right">Role Management</th>
+                  <th scope="col" className="px-4 py-3">Name</th>
+                  <th scope="col" className="px-4 py-3">Email</th>
+                  <th scope="col" className="px-4 py-3">Department</th>
+                  <th scope="col" className="px-4 py-3">ID / Reg Number</th>
+                  <th scope="col" className="px-4 py-3">Role</th>
+                  <th scope="col" className="px-4 py-3 text-right">Role Management</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -548,10 +600,14 @@ export default function AdminDashboard({ user }) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
+                      <label htmlFor={`user-role-select-${u._id}`} className="sr-only">
+                        Change role for {u.name}
+                      </label>
                       <select
+                        id={`user-role-select-${u._id}`}
                         value={u.role}
-                        onChange={(e) => handleRoleChange(u._id, e.target.value)}
-                        className="px-2 py-1 text-xs border border-slate-300 rounded bg-white"
+                        onChange={(e) => handleRoleChange(u._id, u.name, e.target.value)}
+                        className="px-2 py-1 text-xs border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
                       >
                         <option value="student">Student</option>
                         <option value="staff">Staff</option>
@@ -575,6 +631,21 @@ export default function AdminDashboard({ user }) {
         currentUser={user}
         staffList={staffList}
         onUpdate={handleUpdateComplaint}
+      />
+
+      {/* Accessible Confirmation Modal for Deletion */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        title="Delete Complaint Ticket"
+        message={`Are you sure you want to permanently delete ticket ${ticketToDelete?.ticketId || ''}? This action cannot be reversed.`}
+        confirmText="Yes, Delete Ticket"
+        cancelText="Keep Ticket"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setTicketToDelete(null);
+        }}
       />
     </div>
   );

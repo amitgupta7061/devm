@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Building2, Lock, Mail, ArrowRight, ShieldCheck, Wrench, GraduationCap, AlertCircle, Terminal, Cpu } from 'lucide-react';
 
 export default function Login({ onSwitchToRegister, onOpenDevOps }) {
   const { login } = useAuth();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,8 +17,11 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
     setLoading(true);
     try {
       await login(email, password);
+      toast.success('Signed In', 'Welcome back to SmartCampus.');
     } catch (err) {
-      setError(err.message || 'Login failed. Please verify credentials.');
+      const errorMsg = err.message || 'Login failed. Please verify credentials.';
+      setError(errorMsg);
+      toast.error('Authentication Failed', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -29,8 +34,11 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
     setPassword('password123');
     try {
       await login(demoEmail, 'password123');
+      toast.success('Signed In', `Logged in with demo account (${demoEmail}).`);
     } catch (err) {
-      setError(err.message || 'Demo login failed.');
+      const errorMsg = err.message || 'Demo login failed.';
+      setError(errorMsg);
+      toast.error('Login Failed', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -43,7 +51,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
         <button
           onClick={onOpenDevOps}
           type="button"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/90 hover:bg-slate-700 text-sky-400 text-xs font-bold border border-sky-500/30 shadow-lg transition transform hover:scale-105"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/90 hover:bg-slate-700 text-sky-400 text-xs font-bold border border-sky-500/30 shadow-lg transition transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-sky-400"
         >
           <Terminal className="w-4 h-4 text-emerald-400 animate-pulse" />
           <span>Launch DevOps Architecture & Infrastructure Console</span>
@@ -51,7 +59,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
         </button>
       </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 shadow-xl shadow-sky-500/25 mb-3">
           <Building2 className="w-9 h-9 text-white" />
         </div>
@@ -67,7 +75,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-slate-100">
           {error && (
-            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+            <div role="alert" className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -75,7 +83,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              <label htmlFor="login-email-input" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 University Email Address
               </label>
               <div className="relative">
@@ -83,8 +91,10 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-email-input"
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. admin@lpu.in"
@@ -94,7 +104,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              <label htmlFor="login-password-input" className="block text-xs font-semibold text-slate-700 uppercase mb-1">
                 Password
               </label>
               <div className="relative">
@@ -102,8 +112,10 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-password-input"
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -115,7 +127,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-md transition disabled:opacity-50"
+              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-md transition disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               {loading ? 'Authenticating...' : 'Sign In'}
               <ArrowRight className="w-4 h-4" />
@@ -131,7 +143,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
               <button
                 type="button"
                 onClick={() => handleDemoLogin('student@lpu.in')}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[11px] font-medium transition focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <GraduationCap className="w-4 h-4 mb-1 text-blue-600" />
                 <span>Student</span>
@@ -140,7 +152,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
               <button
                 type="button"
                 onClick={() => handleDemoLogin('admin@lpu.in')}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-[11px] font-medium transition focus-visible:ring-2 focus-visible:ring-purple-500"
               >
                 <ShieldCheck className="w-4 h-4 mb-1 text-purple-600" />
                 <span>Admin</span>
@@ -149,7 +161,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
               <button
                 type="button"
                 onClick={() => handleDemoLogin('sunil.network@lpu.in')}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-medium transition focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 <Wrench className="w-4 h-4 mb-1 text-emerald-600" />
                 <span>Staff</span>
@@ -162,6 +174,7 @@ export default function Login({ onSwitchToRegister, onOpenDevOps }) {
 
           <div className="mt-4 text-center">
             <button
+              type="button"
               onClick={onSwitchToRegister}
               className="text-xs text-sky-600 hover:text-sky-800 font-semibold transition"
             >
